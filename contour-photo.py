@@ -8,7 +8,7 @@ from scipy.ndimage import gaussian_filter
 from scipy.special import expit
 
 # load the image
-image = Image.open('/Volumes/fast-external/candidates/new-burning-bush.jpg')
+image = Image.open('/Users/moishe/Desktop/flash_tree-23.jpg')
 # convert image to numpy array
 data = asarray(image)
 print(data.shape)
