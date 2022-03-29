@@ -7,9 +7,13 @@ from scipy.ndimage import gaussian_filter
 
 WIDTH = 1024
 HEIGHT = 1024
-MAX_FOOD_VALUE = 64
+MAX_FOOD_VALUE = 255
 SPAWN_DENOMINATOR = 32
 MAX_VALUE = 64
+
+SEED_COUNT = 1024
+GENERATION_COUNT = 2048
+
 
 LOAD_FROM_FILE = False
 
@@ -17,7 +21,6 @@ SEED_LOC_F = lambda: (WIDTH / 2, HEIGHT / 2)
 
 LOOK_DISTANCE = 15
 RANDOM_WANDER = np.pi / 3
-MAX_FOOD = 16
 
 food = None
 values = None
@@ -82,8 +85,8 @@ class Actor():
 
             for lr in sides:
                 ld = self.direction + (d / 3 * np.pi / 3 * lr)
-                lx = round(np.cos(ld) * LOOK_DISTANCE + self.x)
-                ly = round(np.sin(ld) * LOOK_DISTANCE + self.y)
+                lx = int(np.round(np.cos(ld) * LOOK_DISTANCE + self.x))
+                ly = int(np.round(np.sin(ld) * LOOK_DISTANCE + self.y))
                 if lx > 0 and ly > 0 and lx < WIDTH and ly < HEIGHT:
                     v = values[lx, ly] + food[lx, ly]
                     if v > best_v:
@@ -118,11 +121,11 @@ sorted_value_map = []
 cur_brightest_value_idx = 0
 def cur_brightest():
     global cur_brightest_value_idx, sorted_value_map
-    value = sorted_value_map[cur_brightest_value_idx][1]
-    cur_brightest_value_idx = (cur_brightest_value_idx + 9) % len(sorted_value_map)
+    value = sorted_value_map[cur_brightest_value_idx]
+    cur_brightest_value_idx = (cur_brightest_value_idx + 1) % len(sorted_value_map)
     return value
 
-sigmoid = lambda x: 1/(1 + np.exp(-(x / 255.0 * 20 - 10)))
+normalize_food = lambda x: 1/(1+np.exp(-(x / 255 * 20 - 10))) * MAX_FOOD_VALUE
 
 def start():
     global WIDTH, HEIGHT, SEED_LOC_F, values, food, sorted_value_map
@@ -134,47 +137,41 @@ def start():
         WIDTH = values.shape[0]
         HEIGHT = values.shape[1]
     else:
-        im = Image.open('/Users/moishe/Desktop/ghost-small.jpg')
+        im = Image.open('/Volumes/fast-external/generated/saved-image-portrait.jpg')
         rgb_im = im.convert('RGB')
+        data = np.asarray(rgb_im)
+        print(type(data))
 
-        WIDTH = im.width
-        HEIGHT = im.height
+        WIDTH = data.shape[0]
+        HEIGHT = data.shape[1]
 
         values = np.empty((WIDTH, HEIGHT))
-        food = np.full((WIDTH, HEIGHT), MAX_FOOD)
 
-        value_map = {}
-        for x in range(0, WIDTH):
-            for y in range(0, HEIGHT):
-                value = rgb_im.getpixel((x,y))[0]
-                food[x,y] = sigmoid(value) * MAX_FOOD_VALUE
+        #food = np.array(normalize_food(np.matrix(np.rot90(data[:,:,1], 2)))) # use the red channel for food
 
-                if value not in value_map:
-                    value_map[value] = (x,y)
-                elif np.random.random_sample() < 0.5:
-                    value_map[value] = (x,y)
-
-        sorted_value_map = list(reversed(sorted(value_map.items(), key=lambda x: x[0])))
+        #sorted_value_map = [np.unravel_index(x, food.shape) for x in np.argpartition(food, -SEED_COUNT, axis=None)[-SEED_COUNT:]]
         #SEED_LOC_F = cur_brightest
+
+        food = np.full((WIDTH, HEIGHT), MAX_FOOD_VALUE)
         SEED_LOC_F = lambda: (np.floor(np.random.random_sample() * WIDTH),
                               np.floor(np.random.random_sample() * HEIGHT))
 
 
-        director = Director(2048, 256)
+        director = Director(1024, SEED_COUNT)
 
-        for g in range(0, 2048):
+        for g in range(0, GENERATION_COUNT):
             print(g)
             director.step()
 
         np.save('processed', values)
     # blur the whole image
-    #blurred_values = gaussian_filter(values, sigma=2)
+    #blurred_values = gaussian_filter(values, sigma=1)
     blurred_values = values
 
     fig = plt.gcf()
     fig.set_size_inches(10, 8)
     plt.axis('off')
-    plt.contour(range(0, HEIGHT), range(0, WIDTH), blurred_values, levels=3, alpha = 0.8, linewidths = 0.1, colors='black')
+    plt.contour(range(0, HEIGHT), range(0, WIDTH), blurred_values, levels=8, alpha = 0.8, linewidths = 0.1, colors='black')
     plt.savefig('myimage-2.svg', format='svg', dpi=1200)
     show()
 
